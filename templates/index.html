@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media to QR Code Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        
+        .upload-area:hover {
+            border-color: #007bff;
+        }
+        
+        .upload-area.dragover {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .preview {
+            max-width: 200px;
+            max-height: 200px;
+            margin: 20px auto;
+            display: none;
+        }
+        
+        .qr-result {
+            text-align: center;
+            margin-top: 30px;
+            display: none;
+        }
+        
+        .qr-image {
+            max-width: 300px;
+            margin: 20px auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background: white;
+        }
+        
+        .btn {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        .btn:hover {
+            background: #0056b3;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .file-info {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .qr-info {
+            margin: 10px 0;
+            padding: 10px;
+            background: #e9f7fe;
+            border-radius: 5px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Media to QR Code Generator</h1>
+        <p>Upload any file to generate a QR code that points directly to your media</p>
+        
+        <div class="upload-area" id="uploadArea">
+            <h3>📁 Click to select or drag and drop your file</h3>
+            <p>Supported formats: Images, Videos, Audio, Documents (Max 16MB)</p>
+            <input type="file" id="fileInput" accept="*/*">
+        </div>
+        
+        <div id="filePreview" class="preview"></div>
+        <div id="fileInfo" class="file-info"></div>
+        
+        <div class="loading" id="loading">
+            <p>⏳ Generating QR Code...</p>
+        </div>
+        
+        <div class="qr-result" id="qrResult">
+            <h3>✅ Your QR Code is Ready!</h3>
+            <p>Scan this QR code to access your media directly</p>
+            <img id="qrImage" class="qr-image" src="" alt="QR Code">
+            <div class="qr-info">
+                <strong>QR contains:</strong><br>
+                <span id="qrContent" style="word-break: break-all; font-size: 12px;"></span>
+            </div>
+            <div>
+                <button class="btn" onclick="downloadQR()">Download QR Code</button>
+                <button class="btn" onclick="shareQR()">Share</button>
+                <button class="btn" onclick="resetForm()">Generate Another</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const filePreview = document.getElementById('filePreview');
+        const fileInfo = document.getElementById('fileInfo');
+        const loading = document.getElementById('loading');
+        const qrResult = document.getElementById('qrResult');
+        const qrImage = document.getElementById('qrImage');
+        const qrContent = document.getElementById('qrContent');
+        
+        let currentFileUrl = null;
+        let currentFilename = null;
+        
+        // Click to select file
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        // Drag and drop functionality
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        function handleFile(file) {
+            // Validate file size (16MB)
+            if (file.size > 16 * 1024 * 1024) {
+                alert('File size must be less than 16MB');
+                return;
+            }
+            
+            // Show file preview
+            showFilePreview(file);
+            
+            // Upload and generate QR code
+            uploadAndGenerateQR(file);
+        }
+        
+        function showFilePreview(file) {
+            fileInfo.innerHTML = `
+                <strong>File Name:</strong> ${file.name}<br>
+                <strong>File Size:</strong> ${(file.size / 1024 / 1024).toFixed(2)} MB<br>
+                <strong>File Type:</strong> ${file.type || 'Unknown'}
+            `;
+            
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    filePreview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="max-width: 200px; max-height: 200px;">`;
+                    filePreview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                filePreview.innerHTML = `<div style="font-size: 48px;">📄</div>`;
+                filePreview.style.display = 'block';
+            }
+        }
+        
+        function uploadAndGenerateQR(file) {
+            loading.style.display = 'block';
+            qrResult.style.display = 'none';
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            fetch('/generate_qr', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                loading.style.display = 'none';
+                
+                if (data.success) {
+                    currentFileUrl = data.file_url;
+                    currentFilename = data.filename;
+                    
+                    qrImage.src = data.qr_image;
+                    qrContent.textContent = data.qr_content;
+                    qrResult.style.display = 'block';
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                loading.style.display = 'none';
+                alert('Error: ' + error);
+            });
+        }
+        
+        function downloadQR() {
+            if (currentFileUrl) {
+                window.open(`/download_qr?url=${encodeURIComponent(currentFileUrl)}`, '_blank');
+            }
+        }
+        
+        function shareQR() {
+            if (currentFileUrl) {
+                // Simple URL sharing
+                navigator.clipboard.writeText(currentFileUrl).then(() => {
+                    alert('Media URL copied to clipboard! Share this URL directly.');
+                });
+            }
+        }
+        
+        function resetForm() {
+            fileInput.value = '';
+            filePreview.style.display = 'none';
+            fileInfo.innerHTML = '';
+            qrResult.style.display = 'none';
+            currentFileUrl = null;
+            currentFilename = null;
+        }
+    </script>
+</body>
+</html>
