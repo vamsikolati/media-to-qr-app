@@ -6,3 +6,4 @@ python-dotenv==1.0.0
 pyrebase4==4.6.0
 requests==2.31.0
 cloudinary==1.36.0
+gunicorn
